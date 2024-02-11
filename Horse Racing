@@ -1,0 +1,386 @@
+--1
+SELECT *
+FROM Cheval
+WHERE id_cheval = 249
+
+--2
+SELECT id_cheval
+FROM Cheval
+WHERE pere = 691
+ORDER BY id_cheval DESC
+
+--3
+SELECT DISTINCT id_cheval
+FROM Participe
+WHERE stalle = 4
+ORDER BY id_cheval DESC
+
+--4 
+SELECT DISTINCT annee
+FROM Cheval
+WHERE nom_cheval LIKE 'Sup%'
+ORDER BY annee
+
+--5 
+SELECT DISTINCT Cheval.nom_cheval
+FROM Cheval
+JOIN Participe ON Cheval.id_cheval = Participe.id_cheval
+WHERE Participe.id_e = 432
+
+--6 
+SELECT Course.nom_course, Cheval.nom_cheval AS nom_vainqueur
+FROM Course
+JOIN Participe ON Course.id_course = Participe.id_course
+JOIN Cheval ON Participe.id_cheval = Cheval.id_cheval
+WHERE Participe.position = 1
+
+--7
+SELECT Course.id_course, 
+       Cheval.nom_cheval AS nom_vainqueur, 
+       (Course.distance / Course.temps) * 3.6 AS vitesse_kmh
+FROM Course
+JOIN Participe ON Course.id_course = Participe.id_course
+JOIN Cheval ON Participe.id_cheval = Cheval.id_cheval
+WHERE Participe.position = 1
+      AND (Course.distance / Course.temps) * 3.6 > 60
+ORDER BY vitesse_kmh DESC
+
+--8
+SELECT COUNT(*) AS nombre_de_lignes
+FROM Jockey
+
+--9
+SELECT Cheval.nom_cheval, 
+       Cheval.annee, 
+       2020 - Cheval.annee AS age_en_2020
+FROM Cheval
+JOIN Participe ON Cheval.id_cheval = Participe.id_cheval
+JOIN Course ON Participe.id_course = Course.id_course
+WHERE Course.obstacles = 0
+      AND Course.date >= '2020-02-01' AND Course.date < '2020-03-01'
+ORDER BY age_en_2020 ASC
+
+--10
+SELECT MIN(2020 - Cheval.annee) AS age_minimal
+FROM Cheval
+JOIN Participe ON Cheval.id_cheval = Participe.id_cheval
+JOIN Course ON Participe.id_course = Course.id_course
+JOIN Entraineur ON Participe.id_e = Entraineur.id_e
+WHERE Entraineur.id_e = 32 
+OR Entraineur.id_e = 115
+      AND strftime('%Y', Course.date) = '2020'
+	  
+--11
+SELECT AVG(position) AS moy_position
+FROM Participe
+WHERE id_cheval = 2872
+
+--12
+SELECT C1.nom_cheval, C1.pere, C2.nom_cheval 
+FROM Cheval C1
+JOIN Cheval C2 ON C1.pere = C2.id_cheval
+WHERE C1.id_cheval = 1364
+
+--13
+SELECT strftime('%Y-%m', date) AS mois, COUNT(*) AS nombre_courses
+FROM Course
+WHERE obstacles = 16
+GROUP BY mois
+ORDER BY mois
+
+--14
+SELECT H.id_h, H.nom_h, COUNT(C.id_course) AS nombre_courses
+FROM Hippodrome H
+JOIN Course C ON H.id_h = C.id_h
+GROUP BY H.id_h, H.nom_h
+HAVING COUNT(C.id_course) >= 3
+ORDER BY nombre_courses ASC
+
+--15
+SELECT J.id_j, J.nom_j, COUNT(DISTINCT P.id_cheval) AS nombre_chevaux
+FROM Jockey J
+JOIN Participe P ON J.id_j = P.id_j
+GROUP BY J.id_j, J.nom_j
+HAVING COUNT(DISTINCT P.id_cheval) >= 2
+ORDER BY nombre_chevaux DESC
+
+--16
+SELECT stalle, COUNT(DISTINCT id_cheval) AS nombre_chevaux_gagnants
+FROM Participe
+WHERE position = 1
+GROUP BY stalle
+ORDER BY stalle DESC
+
+--17
+SELECT stalle, AVG(position) AS position_moyenne
+FROM Participe P
+JOIN Cheval C ON P.id_cheval = C.id_cheval
+WHERE C.pere = 56
+GROUP BY stalle
+ORDER BY stalle DESC
+
+--18
+SELECT P.id_j, COUNT(DISTINCT C.classe) AS nombre_classes
+FROM Participe P
+JOIN Course C ON P.id_course = C.id_course
+GROUP BY id_j
+HAVING COUNT(DISTINCT C.classe) >= 4
+
+--19
+SELECT id_course
+FROM Participe
+WHERE  id_course NOT IN (
+    SELECT id_course
+    FROM Participe
+    WHERE stalle = 2
+)
+AND stalle = 3
+
+--20
+SELECT id_cheval, COUNT(*) AS nb_enfants
+FROM Cheval
+WHERE id_cheval IN (SELECT DISTINCT pere FROM Cheval WHERE pere IS NOT NULL)
+GROUP BY id_cheval
+ORDER BY nb_enfants ASC, id_cheval ASC
+
+--21
+SELECT id_cheval, COUNT(*) AS nb_enfants
+FROM Cheval
+WHERE id_cheval IN (SELECT DISTINCT mere FROM Cheval WHERE mere IS NOT NULL)
+GROUP BY id_cheval
+ORDER BY nb_enfants DESC, id_cheval ASC
+
+--22
+CREATE VIEW Parents AS
+SELECT id_cheval, COUNT(*) AS nb_enfants
+FROM Cheval
+WHERE id_cheval IN (SELECT DISTINCT mere FROM Cheval WHERE mere IS NOT NULL)
+   OR id_cheval IN (SELECT DISTINCT pere FROM Cheval WHERE pere IS NOT NULL)
+GROUP BY id_cheval
+ORDER BY nb_enfants DESC, id_cheval ASC
+
+--23
+CREATE VIEW NombreEnfants AS
+SELECT
+    Cheval.id_cheval,
+    COALESCE(COUNT(Parents.id_cheval), 0) AS nb_enfants
+FROM
+    Cheval
+LEFT JOIN Parents ON Cheval.id_cheval = Parents.id_cheval
+GROUP BY
+    Cheval.id_cheval
+ORDER BY
+    Cheval.id_cheval ASC,
+    nb_enfants ASC
+
+--24
+SELECT AVG(NombreEnfants.nb_enfants) AS nombre_moyen_enfants
+FROM NombreEnfants
+
+--25
+SELECT DISTINCT p.id_cheval, c.nom_cheval
+FROM Parents p
+JOIN Cheval c ON p.id_cheval = c.id_cheval
+ORDER BY c.nom_cheval ASC;
+
+WITH Parents AS (
+  SELECT id_cheval, pere AS id_parent
+  FROM Cheval
+  WHERE pere IS NOT NULL
+
+  UNION
+
+  SELECT id_cheval, mere AS id_parent
+  FROM Cheval
+  WHERE mere IS NOT NULL
+)
+
+SELECT DISTINCT gp.id_cheval, gp.nom_cheval
+FROM Parents p1
+JOIN Parents p2 ON p1.id_parent = p2.id_cheval
+JOIN Cheval gp ON p2.id_parent = gp.id_cheval
+ORDER BY gp.nom_cheval ASC
+
+--26
+CREATE VIEW Participation AS
+SELECT id_cheval, COUNT(id_course) AS nb
+FROM Participe
+GROUP BY id_cheval
+ORDER BY nb DESC
+
+--27
+CREATE VIEW Victoires AS
+SELECT id_cheval, COUNT(id_course) AS nb_victoires
+FROM Participe
+WHERE position = 1
+GROUP BY id_cheval
+ORDER BY nb_victoires DESC
+
+--28
+SELECT
+
+    p.id_cheval,
+    COUNT(DISTINCT pc.id_course) AS nb_courses_participees,
+    COALESCE(v.nb_victoires, 0) AS nb_victoires,
+    COALESCE(v.nb_victoires, 0) * 100.0 / COUNT(DISTINCT pc.id_course) AS taux_reussite
+	
+FROM Participation p
+LEFT JOIN Victoires v ON p.id_cheval = v.id_cheval
+LEFT JOIN Participe pc ON p.id_cheval = pc.id_cheval
+GROUP BY p.id_cheval
+ORDER BY taux_reussite ASC
+
+--29
+ALTER TABLE Cheval
+ADD COLUMN distance_totale REAL; 
+UPDATE Cheval
+SET distance_totale = (
+    SELECT SUM(c.distance)
+    FROM Course c
+    JOIN Participe p ON c.id_course = p.id_course
+    WHERE p.id_cheval = Cheval.id_cheval AND p.position != 40)
+
+--30
+CREATE TRIGGER maj_distance_totale
+AFTER INSERT ON Participe
+FOR EACH ROW
+BEGIN
+    UPDATE Cheval
+    SET distance_totale = 
+	( SELECT SUM(Course.distance)
+        FROM Course
+        WHERE Course.id_course = NEW.id_course
+          AND Participe.position != 40
+          AND Cheval.id_cheval = NEW.id_cheval)
+    WHERE Cheval.id_cheval = NEW.id_cheval;
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
